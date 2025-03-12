@@ -10,10 +10,15 @@ module.exports = function validateUser({
   }
 
   if (isNaN(cpf) || cpf.length !== 11) {
-    return { error: "CPF invalido, Deve conter 11 digitos numericos" };
+    return {
+      error: "CPF inválido. Deve conter exatamente 11 dígitos numéricos",
+    };
   }
+
   if (!email.includes("@")) {
-    return { error: "Email invalido. Deve Conter @" };
+    return { error: "Email inválido. Deve conter @" };
   }
-  return null;
+
+  return null; // Retorna null se não houver erro
 };
+
