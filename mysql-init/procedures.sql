@@ -1,81 +1,102 @@
+delimiter / / create procedure registrar_compra (
+    in p_id_usuario int,
+    in p_id_ingresso int,
+    in p_quantidade int
+) begin declare v_id_compra int;
 
--- Cria procedure para registrar uma compra de ingresso
+insert into
+    compra (data_compra, fk_id_usuario)
+values
+    (now (), p_id_usuario);
 
-DELIMITER //
+--Obter o ID  da compra recem criada
+set
+    v_id_compra = last_insert_id ();
 
-CREATE PROCEDURE registrar_compra(
-    IN p_id_usuario INT,
-    IN p_id_ingresso INT,
-    IN p_quantidade INT
+--Registrar os ingressos comprados
+insert into
+    ingresso_compra (fk_id_compra, fk_id_ingresso, quantidade)
+values
+    (v_id_compra, p_id_ingresso, p_quantidade);
+
+end;
+
+/ / delimiter;
+
+
+delimiter // 
+create procedure total_ingressos_usuario(
+    in p_id_usuario int,
+    out p_total_ingressos int
 )
-BEGIN
-    DECLARE v_id_compra INT;
-    INSERT INTO compra (data_compra, fk_id_usuario)
-    VALUES (NOW(), p_id_usuario);
-    SET v_id_compra = LAST_INSERT_ID();
-    INSERT INTO ingresso_compra (fk_id_ingresso, fk_id_compra, quantidade)
-    VALUES (p_id_ingresso, v_id_compra, p_quantidade);
-END; //
 
-DELIMITER ;
+begin
+--inicializar o valor de saida
+    set p_total_ingressos = 0;
+    
+-- Consultar e somar todos os ingressos comprados pelo usuario
 
--- Cria procedure para calcular o total de ingressos comprados por um usuário
+    select coalesce(sum(ic.quantidade), 0)
+    into p_total_ingressos
+    from ingresso_compra ic
+    join compra c on ic.fk_id_compra = c.id_compra
+    where c.fk_id_usuario = p_id_usuario;
+    end; //
 
-DELIMITER //
+    delimiter ;
 
-CREATE PROCEDURE total_ingressos_usuario(
-    IN p_id_usuario INT,
-    OUT p_total_ingressos INT
+show procedure status where db = 'vio_hyago';
+
+set @total = 0;
+
+call total_ingressos_usuario (1,  @total);
+
+select @total;
+
+delimiter //
+create procedure registrar_presenca(
+    in p_id_compra int,
+    in p_id_evento int
 )
-BEGIN
-    SET p_total_ingressos = 0;
-    SELECT COALESCE(SUM(quantidade), 0) INTO p_total_ingressos
-    FROM ingresso_compra ic
-    JOIN compra c ON ic.fk_id_compra = c.id_compra
-    WHERE c.fk_id_usuario = p_id_usuario;
-END; //
+begin
+    -- Registrar presença
+    insert into presenca (data_hora_checkin, fk_id_evento, fk_id_compra)
+    values(now(), p_id_evento, p_id_compra);
+end; //
 
-DELIMITER ;
+delimiter ;
 
--- Cria procedure para registrar a presença de um usuário em um evento
 
-DELIMITER //
+-- procedure parar resumo do usuario
 
-CREATE PROCEDURE registrar_presenca(
-    IN p_id_compra INT,
-    IN p_id_evento INT
-)
-BEGIN
-    INSERT INTO presenca (data_hora_checkin, fk_id_evento, fk_id_compra)
-    VALUES (NOW(), p_id_evento, p_id_compra);
-END; //
+delimiter $$
+create procedure resumo_usuario(in pid int)
+begin
+    declare nome varchar(100);
+    declare email varchar(100);
+    declare totalrs decimal(10,2);
+    declare faixa varchar(20);
 
-DELIMITER ;
+    -- busca o nome e o email do usuario
 
-DELIMITER $$
+    select u.name, u.email into nome, email
+    from usuario u
+    where u.id_usuario = pid;
 
--- Mostra as procedures criadas
+    -- chamada das funçao especifica ja criadas 
 
-SHOW PROCEDURE STATUS WHERE db = 'vio_vini';
+    set totalrs = calcula_total_gasto(pid);
+    set faixa = faixa_etaria((select data_nascimento from usuario where id_usuario = pid)); 
 
--- Testa as procedures criadas --
+    -- exibe o resultado    
+    select nome as nome_usuario, email as email_usuario, totalrs as total_gasto, faixa as faixa_etaria;
+end; $$
+delimiter ;
 
--- Testa a procedure total_ingressos_usuario
+CALL resumo_usuario(1);
 
-SET @numero_ingressos_usuario = 0;
-CALL total_ingressos_usuario(1, @numero_ingressos_usuario);
-SELECT @numero_ingressos_usuario AS total_ingressos;
 
--- Testa a procedure registrar_compra
 
-CALL registrar_compra(2, 1, 2);
 
--- Testa a procedure registrar_presenca
+    
 
-CALL registrar_presenca(2, 1);
-
--- Deleta as procedures criadas
-
-DROP PROCEDURE IF EXISTS total_ingressos_usuario;
-DROP PROCEDURE IF EXISTS registrar_compra;
-DROP PROCEDURE IF EXISTS registrar_presenca;

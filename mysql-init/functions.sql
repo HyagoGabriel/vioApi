@@ -1,104 +1,214 @@
--- cria tabela log_evento
-create table log_evento (
-    id_log int auto_increment primary key,
-    mensage varchar(255),
-    data_log datetime default current_timestamp
-);
-
--- cria função para calcular a idade de um usuário com base na data de nascimento
-create function calcula_idade(datanascimento date) returns int
+-- Criação de function
+delimiter $$
+create function calcula_idade(datanascimento date)
+returns int 
 deterministic
 contains sql
 begin
     declare idade int;
     set idade = timestampdiff(year, datanascimento, curdate());
-    return idade;
-end $$
-
+    return idade ;
+end; $$
 delimiter ;
 
--- cria função para verificar o status do sistema
-delimiter $$
+-- Verifica s e a função especificada foi criada
 
-create function status_sistema() 
+SHOW CREATE FUNCTION calcula_idade;
+
+SELECT  name, calcula_idade(data_nascimento) AS idade FROM usuario;
+
+
+delimiter $$
+create function status_sistema()
 returns varchar(50)
 no sql
 begin
-   return 'sistema em funcionamento';
-end $$
-
+    return "Sistema operando normalmente";
+end; $$
 delimiter ;
 
--- cria função para calcular o total de compras de um usuário
-delimiter $$
+select status_sistema();
 
+delimiter $$
 create function total_compras_usuario(id_usuario int)
 returns int
 reads sql data
 begin
     declare total int;
-    select count(*) into total
-    from compra c
-    where id_usuario = c.fk_id_usuario;
-    return total;
-end $$
 
+    select count(*) into total
+    from compra
+    where id_usuario = compra.fk_id_usuario;
+
+    return total;
+
+end; $$
 delimiter ;
 
--- cria função para registrar um log de evento
-delimiter $$
+select total_compras_usuario(3)  as "total de compras";
 
+-- Tabela para testar a clausula modifies sql data
+
+create table log_evento (
+    id_log int auto_increment primary key,
+    mensagem varchar(255),
+    data_log datetime default current_timestamp
+);
+
+delimiter $$
 create function registrar_log_evento(texto varchar(255))
 returns varchar(50)
-deterministic
+ not deterministic
 modifies sql data
 begin
-    insert into log_evento (mensage) 
+    insert into log_evento(mensagem)
     values (texto);
-    return 'log registrado com sucesso!';
-end $$
 
+    return 'Log inserido com sucesso';
+
+end; $$
 delimiter ;
 
--- verifica se a função foi criada corretamente
-show create function calcula_idade;
+SHOW CREATE FUNCTION registrar_log_evento;
 
--- testa a function calcula_idade
-select calcula_idade('1990-01-01') as idade;
-
--- testa a function calcula_idade com dados da tabela usuario
-select name, calcula_idade(data_nascimento) as idade
-from usuario;
-
--- testa a function status_sistema
-select status_sistema();
-
--- testa a function total_compras_usuario
-select total_compras_usuario(1) as total_compras_usuario;
-
--- deleta as funções criadas
-drop function if exists calcula_idade;
-drop function if exists status_sistema;
-drop function if exists total_compras_usuario;
-drop function if exists registrar_log_evento;
-
--- exibe o create da função registrar_log_evento
-show create function registrar_log_evento;
+-- Vizualiza o estado da variavel de controle para permissoes de criação de funções
 
 show variables like 'log_bin_trust_function_creators' ;
 
-set global log_bin_trust_function_creators = 1;
+-- Alterar a variavel global do MYSQL 
+-- precisa ter permissao de adiministrador do banco
+set global log_bin_trust_function_creators = 1 ;
 
-select registrar_log_evento('teste') as log; 
+select registrar_log_evento('teste') ;
 
 delimiter $$
 create function mensagem_boas_vindas(nome_usuario varchar(100))
 returns varchar(255)
 deterministic
+contains sql 
+begin
+    declare msg varchar(255);
+    set msg = concat('Ola, ',nome_usuario, '! Seja bem-vindo(a) ao sistema VIO.');
+    return msg;
+end; $$
+delimiter ;
+
+select mensagem_boas_vindas("Marcos");
+
+select routine_name from information_schema.routines where routine_type = 'FUNCTION' and routine_schema = 'vio_hyago';
+
+-- maior idade
+delimiter $$
+
+create function is_maior_idade(data_nascimento date)
+returns boolean
+not deterministic
 contains sql
 begin
-   declare msg varchar(255);
-   set msg = concat('Ola,', nome_usuario, '! Seja bem-vindo ao Sistema VIO.' );
-   return msg;
-end $$
+declare idade int;
+set idade = calcula_idade(data_nascimento);
+return idade >= 18;
+end; $$
+
 delimiter ;
+
+-- categorizar usuario por faixa etaria
+delimiter $$
+create function faixa_etaria(data_nascimento date)
+returns varchar(20)
+not deterministic
+contains sql
+begin
+declare idade int;
+set idade = calcula_idade(data_nascimento);
+if idade < 18 then
+    return 'Menor de idade';
+elseif idade < 60 then
+    return 'Adulto';
+else
+    return 'Idoso';
+end if;
+end; $$
+delimiter ;
+
+-- agrupar usuario por faixa etaria
+
+select faixa_etaria(data_nascimento) as faixa, count(*) as quantidade
+from usuario
+group by faixa;
+
+-- identificar um faixa etaria especifica
+select name from usuario
+where faixa_etaria(data_nascimento) = 'Adulto';
+
+-- calcula a media de idade de usuarios
+delimiter $$
+create function media_idade()
+returns decimal(5,2)
+not deterministic 
+reads sql data
+begin
+declare media decimal(5,2);
+select avg(timestampdiff(year, data_nascimento, curdate())) into media
+from usuario;
+return  ifnull(media, 0);
+end; $$
+delimiter ;
+
+-- selecionar idade especifica
+select "A  media de idade dos cliente é maior que 30: " as resultado where media_idade() > 30;
+
+-- exercicio direcionado
+-- calculodo total gasto por usuario
+delimiter $$
+
+create function calcula_total_gasto(pid_usuario int)
+returns decimal(10,2)
+not deterministic
+reads sql data
+begin
+    declare total decimal(10,2);
+    
+    select sum(i.preco * ic.quantidade) into total
+    from compra c
+    join ingresso_compra ic on c.id_compra = ic.fk_id_compra
+    join ingresso i on i.id_ingresso = ic.fk_id_ingresso
+    where c.fk_id_usuario = pid_usuario;
+    
+    return ifnull(total, 0);
+end; $$
+
+delimiter ;
+
+DROP FUNCTION IF EXISTS calcula_total_gasto;
+
+-- buscar a faixa etario de um usuario
+DELIMITER $$
+
+CREATE FUNCTION buscar_faixa_etaria_usuario(pid INT)
+RETURNS VARCHAR(20)
+NOT DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE faixa VARCHAR(20);
+    DECLARE nascimento DATE;
+
+    SELECT data_nascimento INTO nascimento
+    FROM usuario
+    WHERE id_usuario = pid;
+
+    SET faixa = faixa_etaria(nascimento);
+
+    RETURN faixa;
+END$$
+
+DELIMITER ;
+
+
+
+
+
+
+
+
+
