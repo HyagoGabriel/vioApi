@@ -22,7 +22,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: senai@604
-      MYSQL_DATABASE: vio_vini
+      MYSQL_DATABASE: vio_hyago
     ## Mapeia a porta 3306 do container para a máquina 3306 da máquina local
     ports:
       - "3307:3307"
