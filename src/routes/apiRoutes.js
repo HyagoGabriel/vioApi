@@ -19,11 +19,12 @@ router.put("/org", orgController.updateOrg);
 router.delete("/org/:id_organizador", orgController.deleteOrg);
 
 router.post("/evento", upload.single("imagem"), eventoController.createEvento);
-router.get("/evento", verifyJWT, eventoController.getAllEventos);
+router.get("/evento", eventoController.getAllEventos);
 router.get("/evento/data",verifyJWT, eventoController.getEventosPorData);
 router.get("/evento/:data",verifyJWT, eventoController.getEventosPorData7Dias);
 router.put("/evento", eventoController.updateEvento);
 router.delete("/evento/:id_evento", eventoController.deleteEvento);
+router.get("/evento/imagem/:id", eventoController.getImagemEvento);
 
 router.post("/ing", ingController.createIng);
 router.get("/ing", ingController.getAllIngs);
